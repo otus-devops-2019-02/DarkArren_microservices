@@ -1,0 +1,16 @@
+---
+- name: Install Docker
+  hosts: all
+  become: true
+  roles:
+    - geerlingguy.docker
+  tasks:
+    - name: Apt install pip
+      apt:
+        name: python-pip
+        state: present
+    - name: Instal docker module 
+      pip:
+        name: docker # not required. The name of a Python library to install or the url(bzr+,hg+,git+,svn+) of the remote package.,This can be a list (since 2.2) and contain version specifiers (since 2.7).
+        state: present # not required. choices: absent;forcereinstall;latest;present. The state of module,The 'forcereinstall' option is only available in Ansible 2.1 and above.
+
