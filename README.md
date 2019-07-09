@@ -94,6 +94,9 @@ hello-world                 latest              fce289e99eb9        7 weeks ago 
 
 <details>
 
+<details>
+  <summary>HomeWork 15 - Docker-контейнеры</summary>
+
 ## HomeWork 15 - Docker-контейнеры
 
 - Создан проект docker в GCE
@@ -199,3 +202,183 @@ root@b7aaf9b04429:/#
 - Подготовлен сценарий terraform, позволяющий развернуть в облаке n машин на чистой ubuntu 16.04, количество машины определяется переменной vm_count="3" в terraform.tfvars
 - Подготовлены плейбуки ansible: install.yml  - установка docker и необходимых зависимостей, deploy.yml - запуск прилоежния (reddit.yml - запуск плейбуков друг за другом)
 - Подготовлен плейбук для провижининга образа packer - packer.yml
+
+</details>
+
+## HomeWork 16 - Docker-образы. Микросервисы
+
+- Установлен линтер hadolint
+- Загружен архив с исходным кодом микросервисов
+- Созданы Dockerfile: ./post-py/Dockerfile, ./ui/Dockerfile, ./comment/Dockerfile с учетом рекомендаций hadolint
+- Собраны образы микросевисов
+
+<details>
+  <summary>build docker images</summary>
+
+```bash
+docker build -t darkarren/post:1.0 src/post-py \
+&& docker build -t darkarren/comment:1.0 src/comment \
+&& docker build -t darkarren/ui:1.0 src/ui
+```
+
+</details>
+
+- Создана сеть для контейнеров `docker network create reddit`
+- Запущены контейнеры с подключением к созданной сети
+
+<details>
+  <summary>run reddit containers</summary>
+
+```bash
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post darkarren/post:1.0
+docker run -d --network=reddit --network-alias=comment darkarren/comment:1.0
+docker run -d --network=reddit -p 9292:9292 darkarren/ui:1.0
+```
+
+</details>
+
+- Проверил доступность и работоспособность приложения по адресу <http://docker-host:9292>
+
+### HW16: Заданиче со * 1
+
+- Остановил все запущенные контейнеры docker kill $(docker ps -q)
+- Запустил контейнеры с измененными network-alias и дополнительно переданными значениями переменных
+
+<details>
+  <summary>run reddit containers with env</summary>
+
+```bash
+docker run -d --network=reddit --network-alias=post_db_1 --network-alias=comment_db_1 mongo:latest \
+&& docker run -d --network=reddit --network-alias=post_1 --env POST_DATABASE_HOST=post_db_1 darkarren/post:1.0 \
+&& docker run -d --network=reddit --network-alias=comment_1 --env COMMENT_DATABASE_HOST=comment_db_1 darkarren/comment:1.0 \
+&& docker run -d --network=reddit --env POST_SERVICE_HOST=post_1 --env COMMENT_SERVICE_HOST=comment_1 -p 9292:9292 darkarren/ui:1.0
+```
+
+</details>
+
+- Проверил доступность и работоспособность приложения по адресу <http://docker-host:9292>
+
+### Образы приложений
+
+- Изменил Dockerfile для ui с учетом рекомендаций hadolint
+- Пересобрал образ, убедился, что он стал значительно меньше предыдущего
+
+### HW16: Задание со * 2
+
+- Подготовил новый образ для ui. За счет использования alpine в качестве основного образа, а так же чистки лишних библиотек, которые не нужны после сборки образа, и очистки кэша - удалось уменьшить образ до 38.2MB без потери работоспособности
+
+<details>
+  <summary>./ui/Dockerfile</summary>
+
+```dockerfile
+FROM alpine:3.9
+
+
+ENV APP_HOME /app
+RUN mkdir $APP_HOME
+
+WORKDIR $APP_HOME
+COPY Gemfile* $APP_HOME/
+COPY . $APP_HOME
+RUN apk --no-cache add ruby-bundler=1.17.1-r0 ruby-dev=2.5.3-r1 make=4.2.1-r2 gcc=8.2.0-r2 musl-dev=1.1.20-r3 ruby-json=2.5.3-r1 \
+  && bundle install --clean --no-cache --force \
+  && rm -rf /root/.bundle \
+  && apk --no-cache del ruby-dev make gcc musl-dev
+
+ENV POST_SERVICE_HOST post
+ENV POST_SERVICE_PORT 5000
+ENV COMMENT_SERVICE_HOST comment
+ENV COMMENT_SERVICE_PORT 9292
+
+CMD ["puma"]
+
+```
+
+</details>
+
+- Подготовил новый образ для post. Удалось уменьшить образ до 106MB
+
+<details>
+  <summary>./post-py/Dockerfile</summary>
+
+```Dockerfile
+FROM python:3.6.0-alpine
+
+WORKDIR /app
+COPY . /app
+
+RUN apk --no-cache add gcc=5.3.0-r0 musl-dev=1.1.14-r16 \
+    && pip --no-cache-dir install -r /app/requirements.txt \
+    && apk --no-cache del gcc musl-dev
+
+ENV POST_DATABASE_HOST post_db
+ENV POST_DATABASE posts
+
+CMD ["python3", "post_app.py"]
+```
+
+</details>
+
+- Подготовил новый образ для comment. Удалось уменьшить до 35.8MB
+
+<details>
+  <summary>./comment/Dockerfile</summary>
+
+```Dockerfile
+FROM alpine:3.9
+
+ENV APP_HOME /app
+
+RUN mkdir $APP_HOME
+WORKDIR $APP_HOME
+COPY Gemfile* $APP_HOME/
+
+RUN apk --no-cache add ruby-bundler=1.17.1-r0 ruby-dev=2.5.3-r1 \
+    make=4.2.1-r2 gcc=8.2.0-r2 musl-dev=1.1.20-r3 ruby-json=2.5.3-r1 ruby-bigdecimal=2.5.3-r1 \
+    && bundle install --clean --no-cache --force \
+    && rm -rf /root/.bundle \
+    && apk --no-cache del ruby-dev make gcc musl-dev
+COPY . $APP_HOME
+
+ENV COMMENT_DATABASE_HOST comment_db
+ENV COMMENT_DATABASE comments
+
+CMD ["puma"]
+```
+
+</details>
+
+- Получившиеся образы в таблице
+
+<details>
+  <summary>docker images</summary>
+
+```bash
+arren | sort
+darkarren/comment       1.0                 d149d523f32c        About an hour ago    768MB
+darkarren/comment       1.1                 3b421cc61e86        About a minute ago   35.8MB
+darkarren/post          1.0                 22e54cf2e227        42 minutes ago       198MB
+darkarren/post          1.1                 658d72e9d4cd        11 minutes ago       106MB
+darkarren/ui            1.0                 cb3b6b4a33fd        About an hour ago    770MB
+darkarren/ui            1.1                 1be28b54d475        30 seconds ago       38.2MB
+```
+
+</details>
+
+- Создан docker volume `docker volume create reddit_db`
+- Контейнеры перезапущены, к mongodb подключен docker volume
+
+<details>
+  <summary>docker run with volume</summary>
+
+```bash
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db -v reddit_db:/data/db mongo:latest \
+&& docker run -d --network=reddit --network-alias=post darkarren/post:1.1 \
+&& docker run -d --network=reddit --network-alias=comment darkarren/comment:1.1 \
+&& docker run -d --network=reddit -p 9292:9292 darkarren/ui:1.1
+```
+
+</details>
+
+- Добавлен новый пост, контенеры перезапущены, пост на месте.
