@@ -1,0 +1,19 @@
+---
+- name: Deploy app 
+  hosts: tag_app
+  become: true
+  tasks:
+    # - name: Apt install pip
+    #   apt:
+    #     name: python-pip
+    #     state: present
+    # - name: Instal docker module 
+    #   pip:
+    #     name: docker # not required. The name of a Python library to install or the url(bzr+,hg+,git+,svn+) of the remote package.,This can be a list (since 2.2) and contain version specifiers (since 2.7).
+    #     state: present # not required. choices: absent;forcereinstall;latest;present. The state of module,The 'forcereinstall' option is only available in Ansible 2.1 and above.
+    - name: Run reddit docker
+      docker_container:
+        name: reddit # required. Assign a name to a new container or match an existing container.,When identifying an existing container name may be a name or a long or short container ID.
+        image: darkarren/otus-reddit:1.0 # not required. Repository path and tag used to create the container. If an image is not found or pull is true, the image will be pulled from the registry. If no tag is included, 'latest' will be used.
+        published_ports: 9292:9292 # not required. List of ports to publish from the container to the host.,Use docker CLI syntax: C(8000), C(9000:8000), or C(0.0.0.0:9000:8000), where 8000 is a container port, 9000 is a host port, and 0.0.0.0 is a host interface.,Container ports must be exposed either in the Dockerfile or via the C(expose) option.,A value of all will publish all exposed container ports to random host ports, ignoring any other mappings.,If C(networks) parameter is provided, will inspect each network to see if there exists a bridge network with optional parameter com.docker.network.bridge.host_binding_ipv4. If such a network is found, then published ports where no host IP address is specified will be bound to the host IP pointed to by com.docker.network.bridge.host_binding_ipv4. Note that the first bridge network with a com.docker.network.bridge.host_binding_ipv4 value encountered in the list of C(networks) is the one that will be used.
+  
