@@ -621,3 +621,52 @@ ps ax | grep docker-proxy
 - Запустил контейнеры `docker-compose up -d`, написал пост, перезапустил контейнеры и убедился, что пост сохранился
 
 </details>
+
+## HomeWork 19 - Устройство Gitlab CI. Построение процесса непрерывной поставки
+
+- Создан новый хост через docker-machine
+
+<details>
+  <summary>new docker-machine</summary>
+
+```bash
+docker-machine create --driver google --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts --google-machine-type n1-standard-1 --google-disk-size 100 --google-zone europe-west1-b gitlab-ci
+```
+
+</details>
+
+- Подключился к новой vm - `docker-machine ssh gitlab-ci`
+- Подготовил директории и docker-compose.yml для GitLab
+- Установил docker-compose
+- Запустил контейнеры `sudo docker-compose up -d`
+- Разрешил доступ к машине по http / https
+- Зашел на главную GitLab и задал root password
+- Отключил Sign Up
+- Создал Project Group - Homework
+- Создал новый проект в группе - example
+- Добавил remote в репозиторий DarkArren_microservices `git remote add gitlab http://34.76.178.217/homework/example.git`
+- Запушил в gitlab - `git push gitlab gitlab-ci-1`
+- Добавил в репозиторий `.gitalb-ci.yml` и запушил в репозиторий gitlab
+- Получен токен для GitLab Runner `1SzF1G6VcjW5TEd4qxU2`
+- На сервере GitLab CI запущен контейнер gitlab runner
+
+<details>
+  <summary>run gitlab runner</summary>
+
+```bash
+docker run -d --name gitlab-runner --restart always \
+-v /srv/gitlab-runner/config:/etc/gitlab-runner \
+-v /var/run/docker.sock:/var/run/docker.sock \
+gitlab/gitlab-runner:latest
+```
+
+</details>
+
+- Запущена регистрация gitlab runner `docker exec -it gitlab-runner gitlab-runner register --run-untagged --locked=false`
+- Зарегистрирован gitlab runner для проекта
+- CI/CD Pipeline прошел успешно
+- В репозиторий добавлен исходный код приложения reddit
+- Изменил описание pipeline в .gitlab-ci.yml для запуска тестов приложения
+- Добавил файл `simpletest.rb` с описанием теста в директорию приложения
+- Добавил библиотеку для тестирования `rack-test` в `reddit/Gemfile`
+- Запушил изменения в gitlab и убедился, что тесты прошли
