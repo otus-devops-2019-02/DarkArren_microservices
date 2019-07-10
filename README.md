@@ -92,7 +92,7 @@ hello-world                 latest              fce289e99eb9        7 weeks ago 
 - Удалены все незапущенные контейнеры `docker rm $(docker ps -a -q)`
 - Удалены все образы, от которых не зависят запущенные контейнеры `docker rmi $(docker images -q)`
 
-<details>
+</details>
 
 <details>
   <summary>HomeWork 15 - Docker-контейнеры</summary>
@@ -205,6 +205,9 @@ root@b7aaf9b04429:/#
 
 </details>
 
+<details>
+  <summary>HomeWork 16 - Docker-образы. Микросервисы</summary>
+
 ## HomeWork 16 - Docker-образы. Микросервисы
 
 - Установлен линтер hadolint
@@ -281,7 +284,7 @@ RUN mkdir $APP_HOME
 WORKDIR $APP_HOME
 COPY Gemfile* $APP_HOME/
 COPY . $APP_HOME
-RUN apk --no-cache add ruby-bundler=1.17.1-r0 ruby-dev=2.5.3-r1 make=4.2.1-r2 gcc=8.2.0-r2 musl-dev=1.1.20-r3 ruby-json=2.5.3-r1 \
+RUN apk --no-cache add ruby-bundler=1.17.1-r0 ruby-dev=2.5.5-r0 make=4.2.1-r2 gcc=8.3.0-r0 musl-dev=1.1.20-r4 ruby-json=2.5.5-r0 \
   && bundle install --clean --no-cache --force \
   && rm -rf /root/.bundle \
   && apk --no-cache del ruby-dev make gcc musl-dev
@@ -292,6 +295,7 @@ ENV COMMENT_SERVICE_HOST comment
 ENV COMMENT_SERVICE_PORT 9292
 
 CMD ["puma"]
+
 
 ```
 
@@ -316,6 +320,7 @@ ENV POST_DATABASE_HOST post_db
 ENV POST_DATABASE posts
 
 CMD ["python3", "post_app.py"]
+
 ```
 
 </details>
@@ -334,8 +339,8 @@ RUN mkdir $APP_HOME
 WORKDIR $APP_HOME
 COPY Gemfile* $APP_HOME/
 
-RUN apk --no-cache add ruby-bundler=1.17.1-r0 ruby-dev=2.5.3-r1 \
-    make=4.2.1-r2 gcc=8.2.0-r2 musl-dev=1.1.20-r3 ruby-json=2.5.3-r1 ruby-bigdecimal=2.5.3-r1 \
+RUN apk --no-cache add ruby-bundler=1.17.1-r0 ruby-dev=2.5.5-r0 \
+    make=4.2.1-r2 gcc=8.3.0-r0 musl-dev=1.1.20-r4 ruby-json=2.5.5-r0 ruby-bigdecimal=2.5.5-r0 \
     && bundle install --clean --no-cache --force \
     && rm -rf /root/.bundle \
     && apk --no-cache del ruby-dev make gcc musl-dev
@@ -345,6 +350,7 @@ ENV COMMENT_DATABASE_HOST comment_db
 ENV COMMENT_DATABASE comments
 
 CMD ["puma"]
+
 ```
 
 </details>
@@ -382,3 +388,236 @@ docker run -d --network=reddit --network-alias=post_db --network-alias=comment_d
 </details>
 
 - Добавлен новый пост, контенеры перезапущены, пост на месте.
+
+</details>
+
+<details>
+  <summary>HomeWork 17 - Docker, сети, docker-compose</summary>
+
+## HomeWork 17 - Docker, сети, docker-compose
+
+### None network driver
+
+- Запущен контейнер joffotron/docker-net-tools с сететвым драйвером none `docker run -ti --rm --network none joffotron/docker-net-tools -c ifconfig`, в таком контейнере доступен тоько loopback, доступа к внешней сети нет
+
+### Host network driver
+
+- Запущен контейнер joffotron/docker-net-tools с сетевым драйвером host `docker run -ti --rm --network host joffotron/docker-net-tools -c ifconfig`
+- Вывод предудущего запуска контейнера аналогичен выводу при выполнении `docker-machine ssh docker-host ifconfig`
+- Запущено четыре контейнера с nginx `docker run --network host -d nginx`
+- Выполнение `docker ps` показывает что запущен только один контейнер, так как остальные упали по причине того, что все они используют сеть хоста, и при этом первый из запущенных уже занял порт 80
+- Все запущенные контейнеры остановлены `docker kill $(docker ps -q)`
+- На docker-host создан симлинк `sudo ln -s /var/run/docker/netns /var/run/netns`
+- После запуска `docker run -d --network host joffotron/docker-net-tools` вывод `sudo ip netns` не изменился
+- После запуска `docker run -d --network none joffotron/docker-net-tools` в выводе появился еще один namespace `ce75f7d63d5d`
+
+### Bridge network driver
+
+- Создана bridge-сеть reddit `docker network create reddit --driver bridge`
+- Запущены контейнеры reddit с использованием bridge-сети
+
+<details>
+  <summary>docker run --network reddit</summary>
+
+```bash
+docker run -d --network=reddit mongo:latest \
+&& docker run -d --network=reddit darkarren/post:1.0 \
+&& docker run -d --network=reddit darkarren/comment:1.0 \
+&& docker run -d --network=reddit -p 9292:9292 darkarren/ui:1.0
+```
+
+</details>
+
+- Обнаружена проблема с некорректной работой сервисов
+- Контейнеры остановлены `docker kill $(docker ps -q)`
+- Контейнеры перезапущены с использованием --network-alias
+
+<details>
+  <summary>docker run network reddit --network-alias</summary>
+
+```bash
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest \
+&& docker run -d --network=reddit --network-alias=post darkarren/post:1.0 \
+&& docker run -d --network=reddit --network-alias=comment darkarren/comment:1.0 \
+&& docker run -d --network=reddit -p 9292:9292 darkarren/ui:1.0
+```
+
+</details>
+
+- Результат - приложение работает корректно, контейнеры остановлены `docker kill $(docker ps -q)`
+- Созданы новые сети docker-networks
+
+<details>
+  <summary>docker network create</summary>
+
+```bash
+docker network create back_net --subnet=10.0.2.0/24
+
+docker network create front_net --subnet=10.0.1.0/24
+```
+
+</details>
+
+- Контейнеры запущены с использованием новых сетей
+
+<details>
+  <summary>docker run</summary>
+
+```bash
+docker run -d --network=front_net -p 9292:9292 --name ui darkarren/ui:1.0 \
+&& docker run -d --network=back_net --name comment darkarren/comment:1.0 \
+&& docker run -d --network=back_net --name post darkarren/post:1.0 \
+&& docker run -d --network=back_net --name mongo_db --network-alias=post_db --network-alias=comment_db mongo:latest
+```
+
+</details>
+
+- Обнаружена проблема на главной странице приложения `Can't show blog posts, some problems with the post service. Refresh?`
+- Контейнеры подключены к дополнительным сетям `docker network connect front_net post` и `docker network connect front_net comment`, приложение работает корректно
+
+### Сетевой стек
+
+- Подключился по ssh к docker-host `docker-machine ssh docker-host`
+- Установил пакет bridge-utils `sudo apt-get update && sudo apt-get install bridge-utils`
+- Выполнил `sudo docker network ls`
+
+<details>
+  <summary>sudo docker network ls</summary>
+
+```bash
+sudo docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+9820cacd8fab        back_net            bridge              local
+bb82f5fb0c7d        bridge              bridge              local
+b03a6069d26e        front_net           bridge              local
+0c925de52059        host                host                local
+04d056f48418        none                null                local
+```
+
+</details>
+
+- Вывел информацию о bridge-сетях `ifconfig | grep br`
+
+<details>
+  <summary>ifconfig | grep br && brctl show</summary>
+
+```bash
+ifconfig | grep br
+br-9820cacd8fab Link encap:Ethernet  HWaddr 02:42:50:cc:73:ca
+br-b03a6069d26e Link encap:Ethernet  HWaddr 02:42:c4:f3:68:74
+
+brctl show br-9820cacd8fab
+bridge name       bridge id           STP enabled   interfaces
+br-9820cacd8fab   8000.024250cc73ca   no            veth33e7906
+                                                    veth7716168
+                                                    vetheca5e8d
+
+brctl show br-b03a6069d26e
+bridge name       bridge id           STP enabled   interfaces
+br-b03a6069d26e   8000.0242c4f36874   no            veth12b3738
+                                                    vethb898164
+                                                    vethdea83a8
+```
+
+</details>
+
+- Отобразил iptables `sudo iptables -nL -t nat`
+
+<details>
+  <summary>sudo iptables -nL -t nat</summary>
+
+```bash
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+DOCKER     all  --  0.0.0.0/0            0.0.0.0/0            ADDRTYPE match dst-type LOCAL
+
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+DOCKER     all  --  0.0.0.0/0           !127.0.0.0/8          ADDRTYPE match dst-type LOCAL
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+MASQUERADE  all  --  10.0.1.0/24          0.0.0.0/0
+MASQUERADE  all  --  10.0.2.0/24          0.0.0.0/0
+MASQUERADE  all  --  172.17.0.0/16        0.0.0.0/0
+MASQUERADE  tcp  --  10.0.1.2             10.0.1.2             tcp dpt:9292
+
+Chain DOCKER (2 references)
+target     prot opt source               destination
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0
+DNAT       tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:9292 to:10.0.1.2:9292
+```
+
+</details>
+
+- Нашел процесс, который слушает порт 9292:
+
+<details>
+  <summary>ps ax | grep docker-proxy</summary>
+
+```bash
+ps ax | grep docker-proxy
+ 7319 ?        Sl     0:00 /usr/bin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 9292 -container-ip 10.0.1.2 -container-port 9292
+16344 pts/0    S+     0:00 grep --color=auto docker-proxy
+```
+
+</details>
+
+### Docker-compose
+
+- Создал файл `./src/docker-compose.yml`
+- Остановил контейнеры `docker kill $(docker ps -q)`
+- Добавил в env переменную USERNAME `export USERNAME=darkarren`
+- Запустил контейнеры через docker-compose `docker-compose up -d`
+- Убедился в том, что приложение доступно по <http://docker-host:9292>
+
+### HW 17: Самостоятельное задание
+
+- Добавлено использование множественных сетей (двух) front_net и back_net вместо использования одной сети reddit, добавил в файл параметры сетей (network range) и алиасы для сервисов
+- Порт публикации сервиса ui параметризован и будет задаваться переменной `PUBLIC_PORT`
+- Параметризованы версии сервисов, будут использованы переменные `UI_VERSION`, `POST_VERSION` и `COMMENT_VERSION`
+- Добавил файл `./src/.env`, указал в нем параметры для запуска контейнеров docker-compose
+- Убедился что контейнеры поднимаются и работают корректно
+- Выяснил как задается базовое имя проекта при старте контейнеров, очевидно, что по умолчанию берется название папки, в которой находится docker-compose.yml, например в моем случае контенеры (и сети и иже с ними) называются с префиксом `src_`, например: `src_ui_1`. Изменить базовое имя проекта можно следующими способами:
+  - указав параметр `COMPOSE_PROJECT_NAME=foo` в переменных окружения
+  - указав этот параметр в `.env`, который используется в docker-compose.yml
+  - либо указав непосредственно при запуске docker-compose, например: `docker-compose -p foo up -d`
+
+### HW 17: Задание со *
+
+- Скопировал локальную директорию `./src` на хост docker-machine: `docker-machine scp -r -d ./src docker-host:/home/docker-user`
+- Создал файл `docker-compose.override.yml`
+- Добавил запуск в puma в debug режиме и с двумя воркерами посредством инструкции entrypoint для ui и comment микросервисов
+
+<details>
+  <summary>entrypoint</summary>
+
+```bash
+   entrypoint:
+    - puma
+    - --debug
+    - -w 2
+```
+
+</details>
+
+- Добавил подключение к контейнерам папок с докер-хоста
+
+<details>
+  <summary>volumes</summary>
+
+```bash
+   volumes:
+    - /home/docker-user/src/ui:/app
+```
+
+</details>
+
+- Запустил контейнеры `docker-compose up -d`, написал пост, перезапустил контейнеры и убедился, что пост сохранился
+
+</details>
