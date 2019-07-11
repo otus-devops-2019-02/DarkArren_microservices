@@ -23,7 +23,7 @@ build_job:
     - docker build -t gitlab-reddit:$CI_COMMIT_SHORT_SHA .
     - docker tag gitlab-reddit:$CI_COMMIT_SHORT_SHA darkarren/gitlab-reddit:latest
     - docker tag gitlab-reddit:$CI_COMMIT_SHORT_SHA darkarren/gitlab-reddit:$CI_COMMIT_SHORT_SHA
-    - docker push darkarren/gitlab-reddit:$CI_SHORT_COMMIT_SHA
+    - docker push darkarren/gitlab-reddit:$CI_COMMIT_SHORT_SHA
     - docker push darkarren/gitlab-reddit:latest
 
 test_unit_job:
