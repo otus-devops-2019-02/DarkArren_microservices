@@ -19,10 +19,10 @@ build_job:
   stage: build
   script:
     - echo 'Building'
-    - sudo docker login -u darkarren -p ${docker_hub_password}
-    - sudo docker build -t gitlab-reddit:latest .
-    - sudo docker tag gitlab-reddit:latest darkarren/gitlab-reddit:latest
-    - sudo docker push darkarren/gitlab-reddit:latest
+    - docker login -u darkarren -p ${docker_hub_password}
+    - docker build -t gitlab-reddit:latest .
+    - docker tag gitlab-reddit:latest darkarren/gitlab-reddit:latest
+    - docker push darkarren/gitlab-reddit:latest
 
 test_unit_job:
   stage: test
