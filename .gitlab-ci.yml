@@ -20,7 +20,7 @@ build_job:
   script:
     - echo 'Building'
     - docker login -u darkarren -p ${docker_hub_password}
-    - docker build -t gitlab-reddit:$CI_COMMIT_SHA .
+    - docker build -t gitlab-reddit:$CI_COMMIT_SHORT_SHA .
     - docker tag gitlab-reddit:$CI_COMMIT_SHORT_SHA darkarren/gitlab-reddit:latest
     - docker tag gitlab-reddit:$CI_COMMIT_SHORT_SHA darkarren/gitlab-reddit:$CI_COMMIT_SHORT_SHA
     - docker push darkarren/gitlab-reddit:$CI_SHORT_COMMIT_SHA
