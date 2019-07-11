@@ -15,9 +15,14 @@ before_script:
   - bundle install
 
 build_job:
+  image: docker:dind
   stage: build
   script:
     - echo 'Building'
+    - docker login -u darkarren -p $docker_hub_password
+    - docker build -t gitlab-reddit:latest ./reddit
+    - docker tag gitlab-reddit:latest darkarren/gitlab-reddit:latest
+    - docker push darkarren/gitlab-reddit:latest
 
 test_unit_job:
   stage: test
@@ -39,6 +44,18 @@ deploy_dev_job:
   environment:
     name: dev
     url: http://dev.example.com
+
+branch review:
+  stage: review
+  script:
+    - echo "Deploy to $CI_ENVIRONMENT_SLUG"
+  environment:
+    name: branch/$CI_COMMIT_REF_NAME
+    url: http://$CI_ENVIRONMENT_SLUG.example.com
+  only:
+    - branches
+  except:
+    - master
 
 staging:
   stage: stage

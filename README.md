@@ -654,10 +654,7 @@ docker-machine create --driver google --google-machine-image https://www.googlea
   <summary>run gitlab runner</summary>
 
 ```bash
-docker run -d --name gitlab-runner --restart always \
--v /srv/gitlab-runner/config:/etc/gitlab-runner \
--v /var/run/docker.sock:/var/run/docker.sock \
-gitlab/gitlab-runner:latest
+docker run -d --name gitlab-runner --restart always -v /srv/gitlab-runner/config:/etc/gitlab-runner -v /var/run/docker.sock:/var/run/docker.sock gitlab/gitlab-runner:latest
 ```
 
 </details>
@@ -681,4 +678,10 @@ gitlab/gitlab-runner:latest
 
 ### Динамические окружения
 
-- Добавил определение динамического окржуения для веток кроме master
+- Добавил определение динамического окружения для веток кроме master
+
+### HW 19: Задание со *
+
+- Подготовил Dockerfile для сборки docker-image приложения
+- В /srv/gitlab-runner/config/config.toml выставил `priveleged=true`
+- 
