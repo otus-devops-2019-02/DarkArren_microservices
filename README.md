@@ -684,4 +684,5 @@ docker run -d --name gitlab-runner --restart always -v /srv/gitlab-runner/config
 
 - Подготовил Dockerfile для сборки docker-image приложения
 - В /srv/gitlab-runner/config/config.toml выставил `priveleged=true`
+- В разделе `before_script` закомментировал `bundle install`
 - 
