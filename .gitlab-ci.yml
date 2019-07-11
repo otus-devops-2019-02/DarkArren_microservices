@@ -20,8 +20,10 @@ build_job:
   script:
     - echo 'Building'
     - docker login -u darkarren -p ${docker_hub_password}
-    - docker build -t gitlab-reddit:latest .
-    - docker tag gitlab-reddit:latest darkarren/gitlab-reddit:latest
+    - docker build -t gitlab-reddit:$CI_COMMIT_SHA .
+    - docker tag gitlab-reddit:$CI_COMMIT_SHA darkarren/gitlab-reddit:latest
+    - docker tag gitlab-reddit:$CI_COMMIT_SHA darkarren/gitlab-reddit:$CI_COMMIT_SHA
+    - docker push darkarren/gitlab-reddit:$CI_COMMIT_SHA
     - docker push darkarren/gitlab-reddit:latest
 
 test_unit_job:
@@ -30,6 +32,8 @@ test_unit_job:
     - mongo:latest
   script:
     - echo 'Testing 1'
+    - cd reddit
+    - bundle install
     - ruby simpletest.rb
 
 test_integration_job:
