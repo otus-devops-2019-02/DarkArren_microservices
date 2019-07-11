@@ -19,7 +19,7 @@ build_job:
   stage: build
   script:
     - echo 'Building'
-    - docker login -u darkarren -p $docker_hub_password
+    - docker login -u darkarren -p "$docker_hub_password"
     - docker build -t gitlab-reddit:latest .
     - docker tag gitlab-reddit:latest darkarren/gitlab-reddit:latest
     - docker push darkarren/gitlab-reddit:latest
