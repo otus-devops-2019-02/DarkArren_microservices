@@ -56,9 +56,9 @@ branch review:
     - echo $gcloud_compute_service_account > ${HOME}/gcloud-service-key.json
     - gcloud auth activate-service-account --key-file ${HOME}/gcloud-service-key.json
     - gcloud config set project $gcloud_project_id
-    # - mkdir ${HOME}/.ssh
+    - mkdir ${HOME}/.ssh
     # - echo -e $ssh_key > ${HOME}/.ssh/appuser
-    - cat $ssh_key
+    # - cat $ssh_key
     # - cp $ssh_key ${HOME}/.ssh/appuser
     # - cat ${HOME}/.ssh/appuser
     # - chmod 400 ${HOME}/.ssh/appuser
