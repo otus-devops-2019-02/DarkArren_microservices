@@ -61,7 +61,7 @@ branch review:
     # - echo -e $ssh_key > ${HOME}/.ssh/appuser
     # - cat $ssh_key
     # - cp $ssh_key ${HOME}/.ssh/appuser
-    # - cat ${HOME}/.ssh/appuser
+    - cat ${HOME}/.ssh/appuser
     - chmod 400 ${HOME}/.ssh/appuser
     - echo -e 'Host *   \n StrictHostKeyChecking false' > ${HOME}/.ssh/config
     - gcloud compute instances create gitlab-reddit-$CI_COMMIT_SHORT_SHA --boot-disk-size=10GB --image-family reddit-docker --machine-type=g1-small --zone=europe-west3-c --restart-on-failure --tags puma-server
@@ -79,9 +79,9 @@ branch review:
   except:
     - master
 
-remove_review_host:
+cleanup:
   image: google/cloud-sdk:latest
-  stage: review
+  stage: cleanup
   script:
     - gcloud --version
     - echo $gcloud_compute_service_account > ${HOME}/gcloud-service-key.json
