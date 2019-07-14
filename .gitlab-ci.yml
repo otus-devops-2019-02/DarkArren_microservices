@@ -59,9 +59,9 @@ branch review:
   script:
 
     - mkdir ${HOME}/.ssh
-    - echo "$ssh_key" > ${HOME}/.ssh/appuser
+    - cp $ssh_key ${HOME}/.ssh/appuser
     # - echo -e $ssh_key > ${HOME}/.ssh/appuser
-    # - cat $ssh_key
+    - cat $ssh_key
     # - cp $ssh_key ${HOME}/.ssh/appuser
     - cat ${HOME}/.ssh/appuser
     - chmod 400 ${HOME}/.ssh/appuser
