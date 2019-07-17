@@ -1,0 +1,99 @@
+image: ruby:2.4.2
+
+stages:
+  - build
+  - test
+  - review
+  - stage
+  - production
+
+variables:
+  DATABASE_URL: 'mongodb://mongo/user_posts'
+
+before_script:
+  - cd reddit
+  # - bundle install
+
+build_job:
+  image: docker:dind
+  stage: build
+  script:
+    - echo 'Building'
+    - docker login -u ${docker_hub_user} -p ${docker_hub_password}
+    - docker build -t gitlab-reddit:$CI_COMMIT_SHORT_SHA .
+    - docker tag gitlab-reddit:$CI_COMMIT_SHORT_SHA darkarren/gitlab-reddit:latest
+    - docker tag gitlab-reddit:$CI_COMMIT_SHORT_SHA darkarren/gitlab-reddit:$CI_COMMIT_SHORT_SHA
+    - docker push darkarren/gitlab-reddit:$CI_COMMIT_SHORT_SHA
+    - docker push darkarren/gitlab-reddit:latest
+
+test_unit_job:
+  stage: test
+  services:
+    - mongo:latest
+  script:
+    - echo 'Testing 1'
+    - bundle install
+    - ruby simpletest.rb
+
+test_integration_job:
+  stage: test
+  script:
+    - echo 'Testing 2'
+
+deploy_dev_job:
+  stage: review
+  script:
+    - echo 'Deploy'
+  environment:
+    name: dev
+    url: http://dev.example.com
+
+branch review:
+  image: google/cloud-sdk:latest
+  stage: review
+  before_script:
+    - gcloud --version
+    - gcloud auth activate-service-account --key-file $gcloud_compute_service_account
+    - gcloud config set project $gcloud_project_id
+  script:
+    - mkdir ${HOME}/.ssh
+    - cp $ssh_key ${HOME}/.ssh/appuser
+    - chmod 400 ${HOME}/.ssh/appuser
+    - echo -e 'Host *   \n StrictHostKeyChecking false' > ${HOME}/.ssh/config
+    - gcloud compute instances create gitlab-reddit-$CI_COMMIT_SHORT_SHA --boot-disk-size=10GB --image-family reddit-docker --machine-type=g1-small --zone=europe-west3-c --restart-on-failure --tags puma-server
+    - sleep 40
+    - ssh -i ${HOME}/.ssh/appuser -l appuser $(gcloud compute instances list --format='table(name,networkInterfaces[].accessConfigs[0].natIP.notnull().list())' | grep gitlab-reddit-$CI_COMMIT_SHORT_SHA | grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}") "sudo docker network create reddit && sudo docker volume create reddit_db && sudo docker run -d --network=reddit --network-alias=mongo -v reddit_db:/data/db mongo:latest && sudo docker run -d --network=reddit -p 9292:9292 darkarren/gitlab-reddit:$CI_COMMIT_SHORT_SHA"
+    - echo "Deploy to $CI_ENVIRONMENT_SLUG"
+    - sleep 40
+    - curl $(gcloud compute instances list --format='table(name,networkInterfaces[].accessConfigs[0].natIP.notnull().list())' | grep gitlab-reddit-$CI_COMMIT_SHORT_SHA | grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"):9292
+  after_script:
+    - gcloud compute instances delete gitlab-reddit-$CI_COMMIT_SHORT_SHA --quiet --zone europe-west3-c
+  environment:
+    name: branch/$CI_COMMIT_REF_NAME
+    url: http://$CI_ENVIRONMENT_SLUG.example.com
+  only:
+    - branches
+  except:
+    - master
+
+staging:
+  stage: stage
+  when: manual
+  only:
+    - /^\d+\.\d+\.\d+/
+  script:
+    - echo 'Deploy'
+  environment:
+    name: stage
+    url: https://beta.example.com
+
+production:
+  stage: production
+  when: manual
+  only:
+    - /^\d+\.\d+\.\d+/
+  script:
+    - echo 'Deploy'
+  environment:
+    name: production
+    url: https://example.com

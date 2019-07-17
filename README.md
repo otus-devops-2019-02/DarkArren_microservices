@@ -621,3 +621,111 @@ ps ax | grep docker-proxy
 - Запустил контейнеры `docker-compose up -d`, написал пост, перезапустил контейнеры и убедился, что пост сохранился
 
 </details>
+
+## HomeWork 19 - Устройство Gitlab CI. Построение процесса непрерывной поставки
+
+- Создан новый хост через docker-machine
+
+<details>
+  <summary>new docker-machine</summary>
+
+```bash
+docker-machine create --driver google --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts --google-machine-type n1-standard-1 --google-disk-size 100 --google-zone europe-west1-b gitlab-ci
+```
+
+</details>
+
+- Подключился к новой vm - `docker-machine ssh gitlab-ci`
+- Подготовил директории и docker-compose.yml для GitLab
+- Установил docker-compose
+- Запустил контейнеры `sudo docker-compose up -d`
+- Разрешил доступ к машине по http / https
+- Зашел на главную GitLab и задал root password
+- Отключил Sign Up
+- Создал Project Group - Homework
+- Создал новый проект в группе - example
+- Добавил remote в репозиторий DarkArren_microservices `git remote add gitlab http://34.76.178.217/homework/example.git`
+- Запушил в gitlab - `git push gitlab gitlab-ci-1`
+- Добавил в репозиторий `.gitalb-ci.yml` и запушил в репозиторий gitlab
+- Получен токен для GitLab Runner `1SzF1G6VcjW5TEd4qxU2`
+- На сервере GitLab CI запущен контейнер gitlab runner
+
+<details>
+  <summary>run gitlab runner</summary>
+
+```bash
+docker run -d --name gitlab-runner --restart always -v /srv/gitlab-runner/config:/etc/gitlab-runner -v /var/run/docker.sock:/var/run/docker.sock gitlab/gitlab-runner:latest
+```
+
+</details>
+
+- Запущена регистрация gitlab runner `docker exec -it gitlab-runner gitlab-runner register --run-untagged --locked=false`
+- Зарегистрирован gitlab runner для проекта
+- CI/CD Pipeline прошел успешно
+- В репозиторий добавлен исходный код приложения reddit
+- Изменил описание pipeline в .gitlab-ci.yml для запуска тестов приложения
+- Добавил файл `simpletest.rb` с описанием теста в директорию приложения
+- Добавил библиотеку для тестирования `rack-test` в `reddit/Gemfile`
+- Запушил изменения в gitlab и убедился, что тесты прошли
+
+### Окружения
+
+- Изменил шаг deploy_job так, что теперь он описывает окружение dev
+- Убедился в том, что в Operations - Environments появилось описание первого окружения - dev
+- Добавил в .gitlab-ci.yml описание для окружения stage и production
+- Добавил в описание stage и production окружий директиву only, которая позволит запустить job только если установлен semver тэг в git, например, 2.4.10
+- Проверил запуск все job при пуше изменений, которые помечены тегом
+
+### Динамические окружения
+
+- Добавил определение динамического окружения для веток кроме master
+
+### HW 19: Задание со *
+
+#### Сборка Docker image
+
+- Подготовил Dockerfile для сборки docker-image приложения
+- В /srv/gitlab-runner/config/config.toml выставил `priveleged=true` и `volumes = ["/var/run/docker.sock:/var/run/docker.sock", "/cache"]`
+- В разделе `before_script` закомментировал `bundle install`, в test_unit_job добавлена установка зависимостей через `bundle install` для прохождения тестов
+- Для успешной сборки и отправи оборазом в registry необходимо в Settings - CI/CD - Variables добавить параметры
+  - docker_hub_user - логин от учетной записи docker hub
+  - docker_hub_password - пароль от учетной записи docker hub
+- В шаг build добавлены команды сборки контейнера и пуша в registry
+
+<details>
+  <summary>build step</summary>
+
+```bash
+build_job:
+  image: docker:dind
+  stage: build
+  script:
+    - echo 'Building'
+    - docker login -u darkarren -p ${docker_hub_password}
+    - docker build -t gitlab-reddit:$CI_COMMIT_SHORT_SHA .
+    - docker tag gitlab-reddit:$CI_COMMIT_SHORT_SHA darkarren/gitlab-reddit:latest
+    - docker tag gitlab-reddit:$CI_COMMIT_SHORT_SHA darkarren/gitlab-reddit:$CI_COMMIT_SHORT_SHA
+    - docker push darkarren/gitlab-reddit:$CI_COMMIT_SHORT_SHA
+    - docker push darkarren/gitlab-reddit:latest
+```
+
+</details>
+
+- В Settings - CI/CD - Variables добавлены следующие параметры
+  - gcloud_compute_service_account - type: file, value: json-файл кредов от service account с достаточными правами в проекте
+  - gcloud_project_id - type: variable, value: название проекта
+  - ssh_key - type: file, value: приватный ключ пользователя appuser
+- Настроил создание новой машины в GCP при каждом запуске пайплайна
+- Настроил запуск контейнера из образа, собранного на предыдущем шаге
+- Настроил удаление машины, после проверки запуска приложения
+
+#### GitLab runner automated deployment
+
+Skipped
+
+#### Интеграция GitLab и Slack
+
+- Добавил в workspace в Slack приложение incoming webhooks
+- Получил WebHook URL
+- Добавил webhook url в настройках интеграции со Slack в GitLab (Project Settings - Integration - Slack Notification)
+- Убедился что нотификация прошла
