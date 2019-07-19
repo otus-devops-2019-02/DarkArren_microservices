@@ -622,6 +622,9 @@ ps ax | grep docker-proxy
 
 </details>
 
+<details>
+  <summary>HomeWork 19 - Устройство Gitlab CI. Построение процесса непрерывной поставки</summary>
+
 ## HomeWork 19 - Устройство Gitlab CI. Построение процесса непрерывной поставки
 
 - Создан новый хост через docker-machine
@@ -729,3 +732,230 @@ Skipped
 - Получил WebHook URL
 - Добавил webhook url в настройках интеграции со Slack в GitLab (Project Settings - Integration - Slack Notification)
 - Убедился что нотификация прошла
+
+</details>
+
+<details>
+  <summary>HomeWork 20 - Введение в мониторинг. Системы мониторинга</summary>
+
+## HomeWork 20 - Введение в мониторинг. Системы мониторинга
+
+- Создано firewall-правило для prometheus `gcloud compute firewall-rules create prometheus-default --allow tcp:9090`
+- Создано firewall-правило для puma `gcloud compute firewall-rules create puma-default --allow tcp:9292`
+- Создан хост docker-machine
+
+<details>
+  <summary>docker-machine</summary>
+
+```bash
+docker-machine create --driver google \
+--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/
+images/family/ubuntu-1604-lts \
+--google-machine-type n1-standard-1 \
+--google-zone
+```
+
+</details>
+
+- Запущен контейнер Prometheus `docker run --rm -p 9090:9090 -d --name prometheus prom/prometheus:v2.1.0`
+- Поосмтрел метрики, которые уже сейчас собирает prometheus
+- Посмотрел список таргетов, с которых prometheus забирает метрики
+- Остановил контейнер с prometheus `docker stop prometheus`
+- Перенес docker-monolith и файлы docker-compose и .env из src в новую директорию docker
+- Создал директорию под все, что связано с мониторингом - monitoring
+- Добавил monitoring/prometheus/Dockerfile для создания образа с кастомным конфигом
+- Создал конфиг monitoring/prometheus/prometheus.yml
+- Собрал образ prometheus `docker build -t darkarren/prometheus .`
+- Собрал образы микросервисов посредсвом docker_build.sh `for i in ui post-py comment; do cd src/$i; bash docker_build.sh; cd -; done`
+- удалил из docker/docker-compose.yml директивы build и добавил описание для prometheus
+- добавил конфигурацию networks для prometheus в docker-compose
+- актуализировал переменные в .env
+- запустил контейнеры `docker-compose up -d`
+- приложения доступно по адресу <http://34.76.154.234:9292/> и prometheus доступен на <http://34.76.154.234:9090/>
+
+### Мониторинг состояния микросервисов
+
+- Убедился что в prometheus определены и доступны эндпоинты ui и comment
+- Получил статус метрики ui_health, так же получил ее в виде графика
+- Остановил микросервис post и увидел, что метрика изменила свое значение на 0
+- Посмотрел метрики доступности сервисов comment и post
+- Заново запустил post-микросервис `docker-compose start post`
+
+### Сбор метрик хоста
+
+- Добавил определение контейнера node-exporter в docker-compose.yml
+- Добавил job для node-exporter в конфиг Prometheus и пересобрал контейнер
+- Остановил и повторно запустил контейнеры docker-compose
+- Убедился в том, что в списке эндпоинтов пояивлся эндпоинт node
+- Выполнил `yes > /dev/null` на docker-host и убедился что метрики демонстрируют увеличение нагрузки на процессор
+- Загрузил образы на Docker Hub <https://hub.docker.com/u/darkarren>
+
+### HW 20: Задание со * 1
+
+- Решил использовать для мониторинг MongoDB Percona MongoDB Exporter
+- Source code: <https://github.com/percona/mongodb_exporter>
+- Использоваться будет последний релиз - `git checkout tags/v0.8.0`
+- Создал Dockerfile на основе того, что есть в репозитории, добавил в ./monitoring/mongodb-exporter
+- Подготовил образ mongodb-exporter `docker build -t $USER_NAME/mongodb-exporter .`
+- Добавил тэг версии `docker tag $USER_NAME/mongodb-exporter:latest $USER_NAME/mongodb-exporter:0.8.0`
+- Запушил на Docker Hub `docker push $USER_NAME/mongodb-exporter`
+- Добавил в docker-compose запуск контейнера с MongoDB Exporter
+
+<details>
+  <summary>docker-compose mongodb-exporter</summary>
+
+```docker
+  mongodb-exporter:
+    image: ${USERNAME}/mongodb-exporter:${MONGO_EXPORTER_VERSION}
+    ports:
+      - '9216:9216'
+    command:
+      - '--collect.database'
+      - '--collect.collection'
+      - '--collect.indexusage'
+      - '--collect.topmetrics'
+      - '--mongodb.uri=mongodb://post_db:27017'
+    networks:
+      back_net:
+        aliases:
+          - mongodb-exporter
+```
+
+</details>
+
+- Добавил в prometheus.yml job mongod, собирающий метрики mongodb-exporter
+
+<details>
+  <summary>prometheus job</summary>
+
+```bash
+  - job_name: 'mongod'
+    static_configs:
+      - targets:
+        - 'mongodb-exporter:9216'
+```
+
+</details>
+
+- Пересобрал образ prometheus и перезапустил контейнеры
+
+### HW 20: Задание со * 2 - BlackBox Exporter
+
+- Изучил репозиторий prometheus/blackbox-exporter
+- Подготовил Dockerfile для сборки docker image
+
+<details>
+  <summary>Dockerfile blackbox-exporter</summary>
+
+```Dockerfile
+FROM golang:1.11 as golang
+
+ARG VERSION=0.14.0
+
+WORKDIR /go/src/github.com/blackbox_exporter
+
+RUN git clone https://github.com/prometheus/blackbox_exporter.git . && \
+    git checkout tags/v"${VERSION}" && \
+    make
+
+FROM quay.io/prometheus/busybox:latest
+
+COPY --from=golang /go/src/github.com/blackbox_exporter/blackbox_exporter  /bin/blackbox_exporter
+COPY blackbox.yml       /etc/blackbox_exporter/config.yml
+
+EXPOSE      9115
+ENTRYPOINT  [ "/bin/blackbox_exporter" ]
+CMD         [ "--config.file=/etc/blackbox_exporter/config.yml" ]
+```
+
+</details>
+
+- Подготовил конфигурационный файл blackbox.yml с проверками по http и icmp
+
+<details>
+  <summary>blackbox.yml</summary>
+
+```yml
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2"]
+      valid_status_codes:
+        - 200
+        - 404
+      method: GET
+      referred_ip_protocol: "ip4"
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: "ip4"
+
+```
+
+</details>
+
+- Подготовил образ blackbox-exporter `docker build -t $USER_NAME/blackbox-exporter .`
+- Добавил тэг версии `docker tag $USER_NAME/blackbox-exporter:latest $USER_NAME/blackbox-exporter:0.8.0`
+- Запушил на Docker Hub `docker push $USER_NAME/blackbox-exporter`
+- Добавил в docker-compose запуск контейнера с BlackBox Exporter
+
+<details>
+  <summary>blackbox-exporter docker-compose</summary>
+
+```yml
+  blackbox-exporter:
+    image: ${USERNAME}/blackbox-exporter:${BLACKBOX_EXPORTER_VERSION}
+    ports:
+      - '9115:9115'
+    networks:
+      back_net:
+        aliases:
+          - blackbox-exporter
+
+      front_net:
+        aliases:
+          - blackbox-exporter
+```
+
+</details>
+
+- Добавил job в конфиг prometheus и пересобрал контейнер
+
+<details>
+  <summary>prometheus job</summary>
+
+```yml
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module:
+        - http_2xx # Look for a HTTP 200 response.
+        - icmp
+    static_configs:
+      - targets:
+        - ui:9292
+        - comment:9292
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115  # The blackbox exporter's real hostname:port.
+```
+
+</details>
+
+- Добавил переменную BLACKBOX_EXPORTER_VERSION в .env
+- Пересобрал образ prometheus и перезапустил контейнеры `docker-compose donw && docker-compose up -d`
+
+### HW 20 задание со * 3 - Make
+
+- Подготовил Makefile, перед запуском нужно выполнить `export USER_NAME=your-docker-hub-login`
+- Сборка всех контейнеров - `make build-all`
+- Пуш всех контейнеров - `make push-all`
+
+</details>
