@@ -959,3 +959,64 @@ modules:
 - Пуш всех контейнеров - `make push-all`
 
 </details>
+
+<details>
+  <summary>HomeWork 21 - Мониторинг приложения и инфраструктуры</summary>
+
+## HomeWork 21 - Мониторинг приложения и инфраструктуры
+
+### Мониторинг Docker-контейнеров
+
+- Перенес описание приложений для мониторинга в отдельный docker-compose-файл `docker-compose-monitoring.yml`
+- Добавил в docker-compose-monitoring.yml описание для контейнера cAdvisor
+- Добавил в конфиг prometheus job для cadvisor, пересобрал image prometheus
+- Создал в gcloud правило для доступа на 8080 порт `gcloud compute firewall-rules create cadvisor-default --allow tcp:8080`
+- Запустил контейнеры `docker-compose up -d && docker-compose -f docker-compose-monitoring.yml up -d`
+- Изучил информацию, которую предоставляет web-интерфейс cAdvisor
+
+### Визуализация метрик
+
+- Добавил описание Grafana в `docker-compose-monitoring.yml`
+- Запустил контейнер Grafana `docker-compose -f docker-compose-monitoring.yml up -d grafana`
+- Добавил firewall rule для Grafana `gcloud compute firewall-rules create grafana--default --allow tcp:3000`
+- Через web-интерфейс добавил datasource prometheus server
+- Нашел на официальном сайте и загрузил дашборд `Docker and system monitoring` в monitoring/grafana/dashboards/DockerMonitoring.json
+- Импортировал дашборд в Grafana
+- Убедился что появился дашборд, показывающий метрики контейнеров
+
+### Сбор метрик приложения
+
+- В конфиг prometheus.yml добавлен job для сбора метрик с сервиса post
+- Пересобран образ prometheus
+- Пересозданы контейнеры инфраструктуры мониторинга `docker-compose -f docker-compose-monitoring.yml down && docker-compose -f docker-compose-monitoring.yml up -d`
+- В приложении reddit добавлены посты и комментарии к ним
+- В Grafana добавлен новый дашборд
+- В Grafana добавлен график ui_request_count
+- Добавлен график http_requests with error codes
+- Сохранил изменениея в дашборде, проверил наличие версий в options дашборда
+- Добавил rate(ui_request_count[1m]) для первого графика
+- Добавил новый график с вычислением 95-ого процентиля для метрики ui_request_response_time_bucket `histogram_quantile(0.95, sum(rate(ui_request_response_time_bucket[5m])) by (le))`
+- Экспортировал дашборд в виде json
+
+### Сбор метрик бизнес логики
+
+- Создал новый дашборд Business_Logic_Monitoring
+- Добавил на дашборд график `rate(post_count[1h])`
+- Добавил график `rate(comment_count[1h])`
+- Экпортировал дашборд в json
+
+### Алертинг
+
+- Создал Dockerfile для alertmanager
+- Добавил config.yml для alertmanager с индвидуальными настройками webhook
+- Собрал образ alertmanager и запушил в Docker Hub
+- Добавил alertmanager в docker-compose-monitoring.yml
+- Добавил alerts.yml для prometheus
+- Добавил копирование alerts.yml в Dockerfile prometheus
+- Добавил информацию об алертинге в конфиг prometheus и пересобрал образ
+- Перезапустил контейнеры мониторинга
+- Убедился что правила алертинга отображаются в web-интерфейсе Prometheus
+- Остановил сервис post и убедился в том, что оповещение пришло в Slack
+- Запушил все образы в Docker Hub - <https://hub.docker.com/u/darkarren>
+
+</details>

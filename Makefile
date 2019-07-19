@@ -18,6 +18,12 @@ build-blackbox-exporter:
 build-mongodb-exporter:
 	docker build -t $(USER_NAME)/mongodb-exporter:0.8.0 monitoring/mongodb-exporter/
 
+build-alertmanager:
+	docker build -t $(USER_NAME)/alertmanager monitoring/alertmanager
+
+build-fluentd:
+	docker build -t $(USER_NAME)/fluentd logging/fluentd
+
 push-all: push-ui push-comment push-post push-prometheus push-blackbox-exporter push-mongodb-exporter push-alertmanager push-fluentd
 
 push-ui:
@@ -32,6 +38,10 @@ push-blackbox-exporter:
 	docker push $(USER_NAME)/blackbox-exporter:0.14.0
 push-mongodb-exporter:
 	docker push $(USER_NAME)/mongodb-exporter:0.8.0
+push-alertmanager:
+	docker push $(USER_NAME)/alertmanager
+push-fluentd:
+	docker push $(USER_NAME)/fluentd
 
 
 
