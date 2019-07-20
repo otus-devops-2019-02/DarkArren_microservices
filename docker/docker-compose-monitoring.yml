@@ -106,6 +106,20 @@ services:
         aliases:
           - alertmanager
 
+  telegraf:
+    image: ${USER_NAME}/telegraf:${TELEGRAF_VERSION}
+    ports:
+      - 9273:9273
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      back_net:
+        aliases:
+          - telegraf
+      front_net:
+        aliases:
+          - telegraf
+
 volumes:
   prometheus_data:
   grafana_data:

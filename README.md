@@ -1019,4 +1019,65 @@ modules:
 - Остановил сервис post и убедился в том, что оповещение пришло в Slack
 - Запушил все образы в Docker Hub - <https://hub.docker.com/u/darkarren>
 
+### HW21: Задание со *
+
+- В Makefile добавлены команды для сборки новых образов
+- На docker-host в /etc/docker добавлен daemon.json (172.17.0.1 - адрес хоста в сети docker0)
+
+```json
+{
+  "metrics-addr" : "172.17.0.1:9323",
+  "experimental" : true
+}
+```
+
+- В prometheus.yml добавлен таргет для docker
+
+``` yml
+  - job_name: 'docker'
+    static_configs:
+    - targets:
+      - '172.17.0.1:9323'
+```
+
+- В Grafana добавлен дашборд Docker Engine Metrics <https://grafana.com/grafana/dashboards/1229>
+- Добавлен Dockerfile monitoring/telegraf/Dockerfile и конфиг monitoring/telegraf/telegraf.conf
+- Запуск Telegraf добавлен в docker-compose-monitoring.yml
+
+<details>
+  <summary>telegraf docker-compose</summary>
+
+```yml
+  telegraf:
+    image: ${USER_NAME}/telegraf:${TELEGRAF_VERSION}
+    ports:
+      - 9273:9273
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      back_net:
+        aliases:
+          - telegraf
+      front_net:
+        aliases:
+          - telegraf
+```
+
+</details>
+
+- В prometheus.yml добавлен таргет на telegraf
+
+<details>
+  <summary>telegraf prometheus target</summary>
+
+```yml
+  - job_name: 'telegraf'
+    static_configs:
+      - targets: ['telegraf:9273']
+```
+
+</details>
+
+- В Grafana добавлен дашборд Telegraf Docker
+
 </details>

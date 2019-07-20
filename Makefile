@@ -1,4 +1,4 @@
-build-all: build-ui build-comment build-post build-prometheus build-blackbox-exporter build-mongodb-exporter build-alertmanager build-fluentd
+build-all: build-ui build-comment build-post build-prometheus build-blackbox-exporter build-mongodb-exporter build-alertmanager build-fluentd build-telegraf
 
 build-ui:
 	docker build -t $(USER_NAME)/ui:$(APP_TAG) src/ui/
@@ -21,10 +21,10 @@ build-mongodb-exporter:
 build-alertmanager:
 	docker build -t $(USER_NAME)/alertmanager monitoring/alertmanager
 
-build-fluentd:
-	docker build -t $(USER_NAME)/fluentd logging/fluentd
+build-telegraf:
+	docker build -t $(USER_NAME)/telegraf:1.11.1 monitoring/telegraf
 
-push-all: push-ui push-comment push-post push-prometheus push-blackbox-exporter push-mongodb-exporter push-alertmanager push-fluentd
+push-all: push-ui push-comment push-post push-prometheus push-blackbox-exporter push-mongodb-exporter push-alertmanager push-fluentd push-telegraf
 
 push-ui:
 	docker push $(USER_NAME)/ui:$(APP_TAG)
@@ -40,8 +40,9 @@ push-mongodb-exporter:
 	docker push $(USER_NAME)/mongodb-exporter:0.8.0
 push-alertmanager:
 	docker push $(USER_NAME)/alertmanager
-push-fluentd:
-	docker push $(USER_NAME)/fluentd
+push-telegraf:
+	docker push ${USER_NAME}/telegraf:1.11.1
+
 
 
 
