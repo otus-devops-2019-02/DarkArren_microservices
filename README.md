@@ -1081,3 +1081,102 @@ modules:
 - В Grafana добавлен дашборд Telegraf Docker
 
 </details>
+
+<details>
+  <summary>HomeWork 23 - Логирование и респределенная трассировка</summary>
+
+## HomeWork 23 - Логирование и респределенная трассировка
+
+- Обновил код приложения и пересобрал образы `for i in ui post-py comment; do cd src/$i; bash docker_build.sh; cd -; done`
+- Убедился что образы с тегом `logging` существуют, запушил их в Docker Hub
+- Создал новый хост docker-machine
+
+<details>
+  <summary>docker-machine logging</summary>
+
+```bash
+docker-machine create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    --google-open-port 5601/tcp \
+    --google-open-port 9292/tcp \
+    --google-open-port 9411/tcp \
+    logging
+```
+
+</details>
+
+- Окружение настроено на работу с новой vm `eval $(docker-machine env logging)`
+- Получен адрес новой машины `docker-machine ip logging`
+
+### Логирование Docker контейнеров
+
+- Подготовлен compose-файл docker-compose-logging.yml с описанием контейнеров fluentd, elasticsearch, kibana
+- Подготовлен Dockerfile для fluentd **logging\fluentd\Dockerfile**
+- Подготовлен config-файл для fluentd **logging\fluentd\fluent.conf**
+- Собран образ fluentd `docker build -t $USER_NAME/fluentd .`
+- В .env указан тэг logging для ui, post, comment
+- Запустил контейнеры `docker-compose up -d`
+- Просмотрел логи приложения `docker-compose logs -f post`
+- Добавил опередление драйвера для логирования сервиса post в `docker-compose.yml`
+- Запустил контейнеры системы логирования и перезапустил контейнеры приложения
+- Исправил падение контейнера Elasticsearch, изменил параметр на docker-host - `sudo sysctl -w vm.max_map_count=262144`, заработало
+- Добавил Index Pattern на Kibana
+- Посмотрел что логи теперь собираются и отображаются в Kibana
+- Добавил фильтр в конфиг fluentd
+- Пересобрал и перезапустил fluentd `docker-compose -f docker-compose-logging.yml up -d fluentd`
+- Убедился что фильтр применился и вместо одного поля log доступно несколько
+- Убедился что можно найти запись в логе через поиск
+
+### Неструктурированные логи
+
+- Добавил драйвер логирования для сервиса ui
+- Перезапустил контейнер ui `docker-compose stop ui && docker-compose rm ui && docker-compose up -d`
+- Добавил фильтр с использованием регулярного выражения для сервиса ui в конфигурационный файл fluent.conf
+- Пересобрал образ fluentd и перезапустил сервисы логирования
+- Убедился что в кибане корректно распарсились логи микросервиса UI
+- Заменил регулярное выражение на использование grok-паттернов
+- Пересобрал и перезапустил кибану, убедился что логи парсятся корректно
+
+### HW23: Задание со *
+
+- Добавлен второй grok-pattern <https://github.com/fluent/fluent-plugin-grok-parser> в фильтр service.ui
+
+<details>
+  <summary>filter service.ui</summary>
+
+```xml
+<filter service.ui>
+  @type parser
+  format grok
+  grok_pattern service=%{WORD:service} \| event=%{WORD:event} \| request_id=%{GREEDYDATA:request_id} \| message='%{GREEDYDATA:message}'
+  key_name message
+  reserve_data true
+</filter>
+
+<filter service.ui>
+  @type parser
+  format grok
+  grok_pattern service=%{WORD:service} \| event=%{WORD:event} \| path=%{URIPATH:path} \| request_id=%{GREEDYDATA:request_id} \| remote_addr=%{IP:remote_addr} \| method= %{WORD:method} \| response_status=%{NUMBER:response_status}
+  key_name message
+  reserve_data true
+</filter>
+```
+
+</details>
+
+### Распределенный трейсинг ***
+
+- Добавил Zipkin в `docker-compose-logging.yml`
+- В `docker-compose.yml` добавленна env-переменая ZIPKIN_ENABLED=${ZIPKIN_ENABLED} для микросервисов
+- Добавлено значение ZIPKIN_ENABLED в .env
+- Просмотрел трассировки через webui zipkin
+
+### Самостоятельное задание
+
+- Обновил сорцы приложения на "забагованные"
+- Пересобрал контейнеры с тэгом bugged
+- Запустил приложение и посмотрел трейсы. Выясняется, что обращение к серверу post стало занимать 3 секунды, вместо миллисекунд, вероятно проблема с долгим открытием поста именно в этом.
+- Вернул обратно незабагованный код в директорию src.
+
+</details>
