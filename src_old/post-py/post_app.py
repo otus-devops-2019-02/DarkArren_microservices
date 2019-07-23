@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import os
 import prometheus_client
 import time
