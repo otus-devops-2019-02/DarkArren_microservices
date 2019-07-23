@@ -1180,3 +1180,32 @@ docker-machine create --driver google \
 - Вернул обратно незабагованный код в директорию src.
 
 </details>
+
+<details>
+  <summary>HomeWork 25 - Введение в Kubernetes</summary>
+
+## HomeWork 25 - Введение в Kubernetes
+
+- Подготовил Deployment-манифесты для post/comment/ui/mongo
+
+### Kubernetes - The Hard Way
+
+<https://github.com/kelseyhightower/kubernetes-the-hard-way>
+
+- Развернул кластер по гайду и запустил деплойменты
+
+```bash
+kubectl get pods -o wide
+NAME                                  READY   STATUS    RESTARTS   AGE   IP           NODE       NOMINATED NODE
+busybox-bd8fb7cbd-5pkch               1/1     Running   0          29m   10.200.0.2   worker-0   <none>
+comment-deployment-69c487c659-zdjd7   1/1     Running   0          23m   10.200.1.3   worker-1   <none>
+mongo-deployment-6895dffdf4-dk74b     1/1     Running   0          22m   10.200.2.4   worker-2   <none>
+nginx-dbddb74b8-x6tkp                 1/1     Running   0          28m   10.200.0.3   worker-0   <none>
+post-deployment-65899c6d8c-95gtj      1/1     Running   0          22m   10.200.1.4   worker-1   <none>
+ui-deployment-6698c98b75-lml5k        1/1     Running   0          22m   10.200.0.4   worker-0   <none>
+untrusted                             1/1     Running   0          24m   10.200.2.3   worker-2   <none>
+```
+
+- Удалил все ресурсы созданные при прохождении гайда
+
+</details>
