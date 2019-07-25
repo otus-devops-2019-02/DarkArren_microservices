@@ -1319,4 +1319,33 @@ untrusted                             1/1     Running   0          24m   10.200.
 - Добавлены права для сервисного аккаунта `kubectl create clusterrolebinding kubernetes-dashboard  --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard`
 - Залогинился с токеном из `kubectl config view`
 
+### HW26: Задание со *
+
+- Подготовил сценарий создания кластера при помощи terraform согласно рекомендациям.
+- Получил манифест для добавления прав доступа на kubernetes dashboard `kubectl create clusterrolebinding kubernetes-dashboard --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard -o yaml --dry-run`
+
+<details>
+  <summary>dashboard manifest</summary>
+
+```bash
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: kubernetes-dashboard
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: kubernetes-dashboard
+  namespace: kube-system
+```
+
+</details>
+
+
+
+
 </details>
