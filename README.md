@@ -1209,3 +1209,114 @@ untrusted                             1/1     Running   0          24m   10.200.
 - Удалил все ресурсы созданные при прохождении гайда
 
 </details>
+
+<details>
+  <summary>HomeWork 26 - Основные модели безопасности и контроллеры в Kubernetes</summary>
+
+## HomeWork 26 - Основные модели безопасности и контроллеры в Kubernetes
+
+- Установлен kubectl `brew install kubernetes-cli` <https://kubernetes.io/docs/tasks/tools/install-kubectl/>
+- Установлен minikube `brew cask install minikube`
+- Запустил minikube-кластер `minikube start`
+- Убедился что кластер доступен `kubectl get nodes`
+
+### Deployment
+
+#### UI
+
+- Обновил файл ui-deployment.yml
+- Запустил ui в minikube `kubectl apply -f ui-deployment.yml`
+- Убедился что количество реплик соответствует заданному `kubectl get deployment`
+- Получил поды приложения через селектор `kubectl get pods --selector component=ui`
+- Запустил порт-форвардинг для пода `kubectl port-forward ui-5d79c5dc6-66x8x 8080:9292`
+- Проверил что web-интерфейс приложения открывается
+
+#### Comment
+
+- обновил deployment-файл для сервиса comment
+- запустил сервис `kubectl apply -f comment-deployment.yml`
+- убедился что поды прилоежния доступны `kubectl get pods --selector component=comment`
+- проверил доступность сервиса пробросив порт `kubectl port-forward comment-7d6dc6b87d-2mzcm 8080:9292`
+
+#### Post
+
+- обновил deployment-файл по аналогии с comment и ui
+- запустил сервис `kubectl apply -f post-deployment.yml`
+- проверил наличие подов `kubectl get pods --selector component=post`
+- Проверил работоспособность `kubectl port-forward post-6966855766-mxj4k 8080:5000`
+
+#### MongoDB
+
+- обновил deployment-файл
+- Добавил монтирование Volume
+
+### Services
+
+- Добавлен service-файл для микросервиса comment
+- запустил создание сервиса через `kubectl apply -f comment-service.yml`
+- убедился в том, что создались эндпоинты для подов comment `kubectl describe service comment | grep Endpoints`
+- Проверил что имя comment резолвится из подов `kubectl exec -ti post-6966855766-mxj4k nslookup comment`
+- создал сервис-файл post-service.yml и запустил `kubectl apply -f post-service.yml`
+- проверил эндопоинты для подов post `kubectl describe service post | grep Endpoints`
+- Добавил и запустил service для mongodb `kubectl apply -f mongodb-service.yml`
+- Оказывается, что сервисы не могут достучаться до mongodb
+- Добавлен service для comment_db с лейблом `comment_db: "true"`
+- В mongo-deployment.yml так же добавлен лейбл `comment_db: "true"` в метадату деплоймента и в метадату пода
+- Для подов comment добавлена переменная окружений `COMMENT_DATABASE_HOST: comment_db`
+- По аналогии с comment_db добавлен сервис, лейблы и переменная окружения для post_db
+- Обновил / применил новые манифесты `kubectl apply -f .`
+- Проверил логи, убедился что обращение идет к нужным базам
+- Удалил объект mongodb service `kubectl delete -f mongodb-service.yml` `kubectl delete service mongodb`
+- Для обеспечения доступа к UI добавлен сервис ui-service.yml с типом NodePort
+- В ui-service.yml добавлен параметр `nodePort: 32092`
+
+### Minikube
+
+- Страница с UI сервисом доступна `minikube service ui`
+- Список сервисов доступен `minikube service list`
+- Список расширений / аддонов `minikube addons list`
+- Список запущенных подов в namespace default `kubectl get pods`
+- Получены все объекты для аддона dashboard из неймспейса kube-system `kubectl get all -n kube-system --selector app=kubernetes-dashboard`
+
+### Dashboard
+
+- Запущен дашборд `minikube dashboard`
+- Изучен функционал
+
+### Namespace
+
+- Добавлено описание для создания отдельного неймспейса для среды разработки dev-namespace.yml и применены изменений `kubectl apply -f dev-namespace.yml`
+- Приложение запущено в новом неймспейса `kubectl apply -n dev -f .`
+- По причиние возникновения конфликта портов из ui-service.yml убран параметр NodePort
+- Обновил ui-service `kubectl apply -n dev -f ui-service.yml`
+- Убедился что страница UI-сервиса открывается `minikube service ui -n dev`
+- В ui-deployment.yml добавлена информация об окружениях, в которых будет запускаться контейнеры
+- Применил изменения для ui `kubectl apply -n dev -f ui-deployment.yml`
+- Убедился, что теперь в заголовке страницы корректно отображается навзание окружения `Microservices Reddit in dev ui-ff5c4db7f-6b2kl container
+`
+
+### Google Kubernetes Engine
+
+- Запущено создание кластера Kubernetes через web-консоль Google Cloud
+- Подготовлен контекст для подключения к кластеру `gcloud container clusters get-credentials your-first-cluster-1 --zone europe-west3-b --project docker-123456`
+- Убедился что в качестве текущего контекста выставлен контекст для подключения к кластеру GKE `kubectl config current-context`
+- Создан dev namespace `kubectl apply -f ./kubernetes/reddit/dev-namespace.yml`
+- Приложение задеплоено в namespace dev `kubectl apply -f ./kubernetes/reddit/ -n dev`
+- Добавлено правило разрешающее доступ по портам 30000-32767
+- Получены внешние адреса нод кластера `kubectl get nodes -o wide`
+- Получен порт публикации сервиса ui `kubectl describe service ui -n dev | grep NodePort`
+- Убедился, что сервис доступен по адресу `http://<node-ip>:<NodePort>`
+
+<details>
+  <summary>proofpic</summary>
+
+![reddit](https://www.dropbox.com/s/mnxb6wjk1xqpdzf/reddit_gke.png?raw=1)
+
+</details>
+
+- Для кластера в GKE включен Dashboard (Cluster - Edit - Addons - Dashboard)
+- Запустил kubectl proxy, ui доступен <http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/login>
+- Добавлены права для сервисного аккаунта `kubectl create clusterrolebinding kubernetes-dashboard  --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard`
+- Залогинился с токеном из `kubectl config view`
+
+</details>
