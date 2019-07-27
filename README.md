@@ -1345,7 +1345,139 @@ subjects:
 
 </details>
 
+</details>
 
+<details>
+  <summary>HomeWork 27 - Kubernetes. Networks, storages</summary>
 
+## HomeWork 27 - Kubernetes. Networks, storages
+
+### Сетевое взаимодействие
+
+#### Kube-DNS
+
+- Проскейлен в 0 сервис, который следит за количеством kube-dns подов `kubectl scale deployment --replicas 0 -n kube-system kube-dns-autoscaler`
+- Проскейлен в 0 kube-dns `kubectl scale deployment --replicas 0 -n kube-system kube-dns`
+- Проверена невозможность достучаться по имени до сервиса comment из пода ui `kubectl exec -ti -n dev ui-8668977c86-9c2jg ping comment`, доступа нет `ping: bad address 'comment'`
+- Kube-dns-autoscaler возвращен в исходное состояние `kubectl scale deployment --replicas 1 -n kube-system kube-dns-autoscaler`
+- Проверил что в бразуере все работает корректно
+
+#### LoadBalancer
+
+- Обновил UI-деплоймент добавив туда LoadBalancer и прописанный NodePort
+- Обновил компонент UI `kubectl apply -f ui-service.yml -n dev`
+- Получил информацию о созданном LoadBlancer для UI
+
+<details>
+  <summary>kubectl get service -n dev --selector component=ui</summary>
+
+```bash
+NAME   TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)        AGE
+ui     LoadBalancer   10.31.246.101   35.234.98.129   80:32092/TCP   18h
+```
+
+</details>
+
+- Проверил подключение через браузер сразу на 80 порт
+
+#### Ingress
+
+- Добавлен и применен конфиг Ingress для сервиса UI `kubectl apply -f ui-ingress.yml -n dev`
+- Из консоли GCP получена информация о порте сервиса, на который направлен Ingress `Named port: port32092`
+- Получен адрес Ingress
+
+<details>
+  <summary>kubectl get ingress -n dev</summary>
+
+```bash
+NAME   HOSTS   ADDRESS         PORTS   AGE
+ui     *       130.211.12.16   80      4m47s
+```
+
+</details>
+
+- Убран балансировщик Google из ui-service.yml
+- Изменен ui-ingress для того, чтобы он работал как классический web-балансировщик
+
+#### Secret
+
+- Подготовлен сертификат `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=130.211.12.16"`
+- Сертификат загружен в Кубернетес `kubectl create secret tls ui-ingress --key tls.key --cert tls.crt -n dev`
+- Секрет действительно создался `kubectl describe secret ui-ingress -n dev`
+
+#### TLS Termination
+
+- Ingress настроен только на прием HTTPS
+- В Web-консоли видно, что в описании баланщировщика есть только HTTPS
+
+#### HW 27: Задание со *
+
+- Подготовлен манифест для создания объекта Secret используемого в Ingress `kubectl create secret tls ui-ingress --key tls.key --cert tls.crt -n dev -o yaml --dry-run > ui-ingress-secret.yml`
+
+<details>
+  <summary>ui ungress secret</summary>
+
+```yaml
+apiVersion: v1
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNyakNDQVpZQ0NRQ3hXRW1QL1A5c0RqQU5CZ2txaGtpRzl3MEJBUXNGQURBWk1SY3dGUVlEVlFRRERBNHgKTXpBdU1qRXhMakV5TGpFMkNqQWVGdzB4T1RBM01qWXhOREV5TWpWYUZ3MHlNREEzTWpVeE5ERXlNalZhTUJreApGekFWQmdOVkJBTU1EakV6TUM0eU1URXVNVEl1TVRZS01JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBCk1JSUJDZ0tDQVFFQXkxWVc5MXBFR0t5cFFsSUp5aWVyKzNHVEYwdWcrNy9yTlh3aWY2RG9BNGFsdjdqNENMd1cKeEJuWnFoRTFNcXM1Njl1OXhCeHZmb1lUMzVKekkva2NXMU9lcDJPWDRKRklTKzR4MmVqRndlZjRoUDVldmZvTAptcUpxR280U0tURXhHSlRxNmdvV0p0a3R5R0ZIUUZyWXArbm4vb3lxVktRQXFmYWZURmhUdkI2TFlpMzZOTGhZClNhM1ZTTmNVTU9Xb3dYNkczdnEyRzdUVGZRbEZSYWw1YkJzMHhTWmh2YUdMUlFQNCtFMWlmbFlkbE5jRzZ6OUMKTURXWGozUzZmdGcxNEtWeGI0Rm95Z28yQ3NpSGFGekR1bm1oMm9tKzEvQjg3TmpkcWNxbE1YQUNhV1VJbjJsUwoxbjB4MXlKTmlmVURjdWFJbEtYcGRHNWZYUWZyVGxDTzN3SURBUUFCTUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCCkFRRExUMlVtejRoaWE1R1M5RW5XY0liajQ4Wno1VjBSRGZCZ20xd0YvV1hJT1lYU3FxaUMvalREbVprRmVSSEYKVDc0RmMrZDVLWE5HZDBCVHBsMzV0TlBRNVRvdGQxVVFITjA1d0lhdU1oMldWZTA2RzhVbm1KTzdwWkQrZElQawpBT2hUYVFWU3Y2YUF5QUlIUWFJWEt0Wkl6VURsc244RkczZVVxMGtIOW43NlRMT24rSjlhOTAwdTZNYWJFSEc3ClVrQ2c4T2Naa0hoRHlOMG9Bd0NHOWhjUFRsbGhBaitibWZrT2NzT0h5U0tHL1BmTjVyUW52dE1tZkFkb21CalcKN0lUMUtLaDc2UlRCNkN6aE85VndXTEF4dlZCdHZoMERCYy9RMWcyREsrL3VTa1NDaUtJZk1FTHhFS1NzdExLbAp4bXdtTWNmamkrcll5ZzV6Z2lWSUpLR0MKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUV2d0lCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktrd2dnU2xBZ0VBQW9JQkFRRExWaGIzV2tRWXJLbEMKVWduS0o2djdjWk1YUzZEN3YrczFmQ0ovb09nRGhxVy91UGdJdkJiRUdkbXFFVFV5cXpucjI3M0VIRzkraGhQZgprbk1qK1J4YlU1Nm5ZNWZna1VoTDdqSFo2TVhCNS9pRS9sNjkrZ3Vhb21vYWpoSXBNVEVZbE9ycUNoWW0yUzNJCllVZEFXdGluNmVmK2pLcFVwQUNwOXA5TVdGTzhIb3RpTGZvMHVGaEpyZFZJMXhRdzVhakJmb2JlK3JZYnROTjkKQ1VWRnFYbHNHelRGSm1HOW9ZdEZBL2o0VFdKK1ZoMlUxd2JyUDBJd05aZVBkTHArMkRYZ3BYRnZnV2pLQ2pZSwp5SWRvWE1PNmVhSGFpYjdYOEh6czJOMnB5cVV4Y0FKcFpRaWZhVkxXZlRIWElrMko5UU55NW9pVXBlbDBibDlkCkIrdE9VSTdmQWdNQkFBRUNnZ0VCQU1HUTdzUUIxaGwzSkpuUjV5ZmVwRVgxVklVMHBjZUNaN0srdlVpcU1MUksKbGJieHFvMEdJTllGbGNQa0piUmFkQVVuWm5zdVpxVVhsZ3ViS3Fqd0dDS0ljOXY5WHpPVW1qSk9TbjZhck1kdQp3Skk2Wkk2TlhrYVNubGN4TC9DdXQ0SWpJWTR5ayt2Zmkwblo4UzQrVFVscnprSHdQcVhjaWhWQ2hWcjBLcUpFCjd3TDNSQ0hiOGNSTi8zdy9XWTBENjNZcWNEcGVPcWJ3YWdaL1ZZVy9MdlBmbUNnandwRnBwaHNpaFZMMWhWeGYKeUpGOTlwV2g2NUtCWDVIVkp2YkpCU0drbUhtLzNtUnhNR3BPQVY0b0ZsS3hUNlZiZUJBNnVtcVNDL1BTS1FraApXRkJMQy81ZFI1UU5Jc2R5TkFDWkRucFBxWHRtUDdqMW5Kd3RSanFhckVFQ2dZRUE2V2RuUVhHTjIwM3lrZDFmCmNZbVd1TG44ZHk5UFZsc0xFcVdTYWR6WHJJRlNtMUMzZE5OS2pPV0pVUHgxNFE3b2pwb0c2VjVGNis3aEdNVlIKZmdRUktJL0E2OE0rS2pHUkpackFUODExMXkvTUtaT2pRaUdjbmZ1ZHN4U2lDVG91aW1hMVVVZ3ZFeHJlRmNwQgppZFJMbnNaV1c1eTJsMnFVMmExbzNITFdZcGNDZ1lFQTN3V0FWQXVJU3RzUjNJUFFMYWhCR1dId0swWWF6TzRJCm1qbXhaMVJROS8xaXphYUxOZ2hHNlJUZ3FlWG0zZ1A3SnpWN0F2WnRscFBlaGdmNi9MOGZnUlhVZ3FqZEdtK0IKdWhycktyUVhOZFVsa3RiZHN6MGl6T0haajlSUEM4S3dzbElVcUZFUk9VOU9kWGZiU09CbDJ4bDFHQ2orNGt5WQorbTFpcmZ4aDV2a0NnWUI1OHg4T0lJaWY1eEF3aWx2TjlMZWRlUCtpUGtQVHVPb0dLaUJmMDVXVWVsVnc5VEdGCmhzaFM2Yk5mYnlrZ0dDd0dKaEFxYXFsWjVvd1I1emIzQXFUOGJtKzhQMTBCcXJoTno1ZGZtdGhSUUpZSnV5djMKNTV2dko0SjBDUG5Jbkcrb3ZKVk1ETTBiekZQeFNxWUhuN2FMRk5JV044Rm5SN2JTTFRxMnhBR2pyUUtCZ1FDSQpZTWpVbkNpLy9hNnlkamg3Y3dROERWUGNZb1pKQXRabjJSZk81QlNQVVhkMTRuNEdrSkVzUHdRVFlPOEluTTZjCmIydkZxQVBqckpES3pWNkI2QzNQdGhXNXdLRlVaUk9qUm9yQUZsaUxKc2hQUHUxYmllc1o5cElnRGVnNGZObW8KY2VFSC9Hclg3Tk5CcWdXQ1R4WjZJTnNsNXd2V1BwamRxcjVKUHFodm9RS0JnUURiVloralBodXRHdCtOcWtWdgppaEU5SnNPZittN0JHWVdsazZiRCtPNm1Kb2RaRTlLL01XV09ySEVTMDVpU0Uwc2VKZFdzdHErUlpmdVg3ekloCklBbmh4bGZCVUpFUTBjOGRXVWgyV0g5d2c0UVJsLzV6NHJhczluN08yN1daZnR5bVdrTVdIK2svakowbGR5clIKSHZJM1c2dzN1RGhMdWUrRVoxYkpGMXgyb2c9PQotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tCg==
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: ui-ingress
+  namespace: dev
+type: kubernetes.io/tls
+
+```
+
+</details>
+
+#### Network Policy
+
+- Получено имя контейнера `gcloud beta container clusters list`
+- Активирован Addon NetworkPolicy `gcloud beta container clusters update reddit-gke --zone=europe-west3-b --update-addons=NetworkPolicy=ENABLED`
+- Включена NetworkPolicy для кластера `gcloud beta container clusters update reddit-gke --zone=europe-west3-b  --enable-network-policy`
+- Добавлена политика доступа к mongodb `mongo-network-policy.yml`
+- Применена политика доступа к монго, доступ с comment есть, доступа с post нет
+- В политику добавлен селектор для подов post
+
+<details>
+  <summary>podSelector post</summary>
+
+```yaml
+- podSelector:
+    matchLabels:
+      app: reddit
+      component: post
+```
+
+</details>
+
+### Хранилища
+
+#### Volume
+
+- Создан диск в Google Cloud `gcloud compute disks create --size=25GB --zone=europe-west3-b reddit-mongo-disk`
+- В mongo-deployment добавлен volume для пода и применены ихменения `kubectl apply -f mongo-deployment.yml -n dev`
+- Добавлен пост в web-интерфейсе и пересоздан деплоймент монго `kubectl delete deploy mongo -n dev` и `kubectl apply -f mongo-deployment.yml -n dev`
+- Пост сохранился!
+
+#### PersistentVolume
+
+- В mongo-volume.yml добавлено описание persistentVolume и он добавлен в кластер `kubectl apply -f mongo-volume.yml -n dev`
+
+#### PersistentVolumeClaim
+
+- Добавлено описание PVC (запрос на место) mongo-claim.yml и выполнено добавление в кластер `kubectl apply -f mongo-claim.yml -n dev`
+- Получено описание стандартного StorageClass, используемого для создания PV если он не будет найден по заданным параметрам или будет занят другим Claim `kubectl describe storageclass standard -n dev`
+- PVC подключен к поду монго в mongo-deployment.yml
+
+#### Динамическое выделение Volume
+
+- Добавлено описание StorageClass для ssd дисков в storage-fast.yml
+- Добавлено описание PVC, ссылающееся на созданный StorageClass
+- Динамический PVC добавлен к подам монго в mongo-deployment.yml
+- Получен список созданных PersistentVolume `kubectl get persistentvolume -n dev`
 
 </details>
