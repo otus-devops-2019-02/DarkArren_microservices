@@ -1481,3 +1481,143 @@ type: kubernetes.io/tls
 - Получен список созданных PersistentVolume `kubectl get persistentvolume -n dev`
 
 </details>
+
+<details>
+  <summary>HomeWork 28 - CI/CD в Kubernetes</summary>
+
+## HomeWork 28 - CI/CD в Kubernetes
+
+- Пересоздан кластер без деплоя компонентов
+- Добавлен namespace dev `kubectl apply -f ./kubernetes/reddit/dev-namespace.yml`
+
+### Helm
+
+- Установлен клиент Helm `brew install kubernetes-helm`
+- Подготовлен манифест для Tiller `kubectl apply -f tiller.yml`
+- Запущен Tiller-сервер `helm init --service-account tiller`
+- Проверено создание tiller-сервера (пода) `kubectl get pods -n kube-system --selector app=helm`
+
+#### Charts
+
+- Подготовлены директории для helm charts
+- Создано описание чарта для UI
+
+#### Templates
+
+- Все ui-related манифесты перенесены в Charts/ui/templates
+- Запущена установка `helm install --name test-ui-1 ./Charts/ui`
+
+<details>
+  <summary>helm install --name test-ui-1 ./Charts/ui</summary>
+
+```bash
+helm install --name test-ui-1 Charts/ui
+NAME:   test-ui-1
+LAST DEPLOYED: Sat Jul 27 14:28:39 2019
+NAMESPACE: default
+STATUS: DEPLOYED
+
+RESOURCES:
+==> v1/Pod(related)
+NAME                 READY  STATUS             RESTARTS  AGE
+ui-8668977c86-84rrw  0/1    ContainerCreating  0         0s
+ui-8668977c86-d5vsv  0/1    ContainerCreating  0         0s
+ui-8668977c86-l6pg7  0/1    ContainerCreating  0         0s
+
+==> v1/Secret
+NAME        TYPE               DATA  AGE
+ui-ingress  kubernetes.io/tls  2     0s
+
+==> v1/Service
+NAME  TYPE      CLUSTER-IP     EXTERNAL-IP  PORT(S)         AGE
+ui    NodePort  10.31.243.198  <none>       9292:31213/TCP  0s
+
+==> v1beta1/Ingress
+NAME  HOSTS  ADDRESS  PORTS  AGE
+ui    *      80, 443  0s
+
+==> v1beta2/Deployment
+NAME  READY  UP-TO-DATE  AVAILABLE  AGE
+ui    0/3    3           0          0s
+```
+
+</details>
+
+- Выведен список установленный helm charts `helm ls`
+
+<details>
+  <summary>helm ls</summary>
+
+```bash
+helm ls
+NAME     	REVISION	UPDATED                 	STATUS  	CHART   	APP VERSION	NAMESPACE
+test-ui-1	1       	Sat Jul 27 14:28:39 2019	DEPLOYED	ui-1.0.0	1          	default
+```
+
+</details>
+
+- Шаблонизированы ui/templates/service.yaml, ui/templates/deployment.yaml, ui/templates/ingress.yaml
+- Добавлен файл со значениями переменных ui/values.yaml
+- Установлены три релиза `helm install ui --name ui-1 && helm install ui --name ui-2 && helm install ui --name ui-3`
+- Получены данные о созданных ингрессах `kubectl get ingress`
+
+<details>
+  <summary>kubectl get ingress</summary>
+
+```bash
+ kubectl get ingress
+NAME      HOSTS   ADDRESS         PORTS   AGE
+ui-1-ui   *       35.244.187.59   80      9m5s
+ui-2-ui   *       130.211.12.16   80      9m2s
+ui-3-ui   *       34.98.107.115   80      8m58s
+```
+
+</details>
+
+- Кастомизированы ui/templates/deployment.yaml, ui/templates/service.yaml и ui/templates/ingress.yaml
+- Выполнен апгрейд для всех трех инсталляций `helm upgrade ui-1 ui/ && helm upgrade ui-2 ui/ && helm upgrade ui-3 ui/`
+- Подготовлен пакет для сервиса post
+- Подготовлен пакет для сервиса comment
+- Для сервиса comment добавлен helper
+- Хелперы добавлены в чарты для всех сервисов, в шаблоны манифестов добавлено использование хелпера
+
+#### Управление зависимостями
+
+- Создан reddit/Chart.yaml, reddit/values.yaml и reddit/requirements.yaml
+- Выполнена загрузка зависимостей `helm dep update`
+- Выполнен поиск чартов в открытом доступе `helm search mongo`
+- В reddit\requirements.yaml добавлен пакет mongo и обновлены зависимости `helm dep update`
+- Выполнил установку приложения `helm install reddit --name reddit-test`
+- Главная страница приложения запускается, но UI не может получить доступ к базе данных
+- В ui/deployment.yaml добавлены описания переменных окружения
+- В values для ui добавлены переменные postHost, postPort, commentHost, commentPort
+- Так же "перезаписывающие" значниея переменных добавлены в reddit/values.yaml
+- Выполнено обновление зависимостей `helm dep update ./reddit`
+- Выполнен апгрейд приложения в k8s `helm upgrade reddit-test ./reddit/`
+- Проблема с дотсупом к базе решилась
+
+### GitLab + Kubernetes
+
+- Через web-интерфейс GCP к кластеру добавлен еще один node pool состоящий из одной машины n1-standard-2
+- В параметрах кластера включено Legacy Authorization
+- Добавлен репозиторий чартов гитлаб `helm repo add gitlab https://charts.gitlab.io`
+- Загружен чарт gitlab-omnibus `helm fetch gitlab/gitlab-omnibus --version 0.1.37 --untar`
+- Внесены изменения в gitlab-omnibus/values.yaml
+- Внесены изменения в gitlab-omnibus/templates/gitlab/gitlabsvc.yaml
+- Внесены изменения в gitlab-omnibus/templates/gitlab-config.yaml
+- Внесены изменения в gitlab-omnibus/templates/ingress/gitlab-ingress.yaml
+- Запущена установка gitlab `helm install --name gitlab . -f values.yaml`
+- Получен адрес `kubectl get service -n nginx-ingress nginx`
+- В /etc/hosts внесена запись для развернутого GitLab `echo "35.234.64.25 gitlab-gitlab staging production” >> /etc/hosts`
+- Залогинился в Gitlab
+- Создана группа http://gitlab-gitlab/darkarren
+- В Settings - CI/CD добавлены переменные CI_REGISTRY_USER и CI_REGISTRY_PASSWORD
+- Создан проект deploy-reddit
+- Добавлены проекты ui, comment, post
+- Исходный код сервисов скопирован в локальную директорию Gitlab_ci
+- Код сервисов загружен в соответсвующие репозитории в GitLab
+- Чарты перенесены в директорию reddit и загружены в Gitlab в проект reddit-deploy
+- В репозитории сервисов загружены пайплайны gitlab-ci
+- Обновлены ui/templates/ingress.yaml и ui/values.yaml
+- Проверена возможность деплоить в отдельное окружение из бранчей
+- Добавлены staging и production среды для приложения
