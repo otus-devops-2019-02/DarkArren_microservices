@@ -1621,3 +1621,54 @@ ui-3-ui   *       34.98.107.115   80      8m58s
 - Обновлены ui/templates/ingress.yaml и ui/values.yaml
 - Проверена возможность деплоить в отдельное окружение из бранчей
 - Добавлены staging и production среды для приложения
+
+</details>
+
+<details>
+  <summary>HomeWork 29 - Kubernetes. Мониторинг и логирование</summary>
+
+## HomeWork 29 - Kubernetes. Мониторинг и логирование
+
+- Для кластера отключен Stackdriver Monitoring и Stackdriver Logging
+- Установлен nginx `helm install stable/nginx-ingress --name nginx`
+- Получен адрес nginx `kubectl get svc` и добавлен в /etc/hosts
+
+### Мониторинг
+
+- Загружен helm chart prometheus `helm fetch --untar stable/prometheus`
+- Для prometheus добавлены кастомные значения переменных в custom_values.yaml
+- Выполнена установка prometheus `helm upgrade prom . -f custom_values.yml --install`
+- В custom_values.yml для prometheus включен сервис kube-state-metrics, релиз обновлен и запущен `helm upgrade prom . -f custom_values.yml --install`
+- В Targets появились "kubernetes_service_endpoints" и добавились метрики "kube_*"
+- В custom_values.yml включены поды node_exporter, в Targets появились три новых эндпоинта с метками "node-exporter"
+- Выполнена установка приложения reddit
+
+```bash
+helm upgrade reddit-test ./reddit --install
+helm upgrade production --namespace production ./reddit --install
+helm upgrade staging --namespace staging ./reddit --install
+```
+
+- Добавлен servicediscovery приложений, запущенных в k8s, по метке reddit, в Targets отбразились reddit-endpoints
+- Добавлен mapping лейблов, у эндпоинтов появились лейблы app/component/instance/relese
+- Добавлены лейблы на основе лейблов __meta_kubernetes_namespace и __meta_kubernetes_service_name
+- Добавлен аналогичный job, для подов из неймспейса production
+- Конфигурация `reddit-endpoints` разделена на три отдельных для post \ comment \ ui
+
+### Визуализация
+
+- Установлена Grafana
+
+```bash
+helm upgrade --install grafana stable/grafana --set "adminPassword=admin" \
+--set "service.type=NodePort" \
+--set "ingress.enabled=true" \
+--set "ingress.hosts={reddit-grafana}"
+```
+
+- Добавлен Datasource Prometheus
+- Добавлен Dashboard `Kubernetes cluster monitoring (via Prometheus)`
+- Добавлены дашборды из задания по мониторингу
+- Параметризированы все дашбордыы, отражающие параметры работы приложения reddit для работы с несколькими окружениями(неймспейсами). Сохранены в `kubernetes/monitoring/grafana`
+
+</details>
