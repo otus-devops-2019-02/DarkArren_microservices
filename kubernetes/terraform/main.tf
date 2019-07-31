@@ -11,6 +11,9 @@ resource "google_container_cluster" "primary" {
   initial_node_count = 1
   min_master_version = "1.13.7-gke.8"
 
+  # Disable stackdriver logging and monitoring
+  logging_service    = "none"
+  monitoring_service = "none"
   # Setting an empty username and password explicitly disables basic auth
   master_auth {
     username = ""
@@ -28,6 +31,9 @@ resource "google_container_cluster" "primary" {
       disabled = false
     }
     kubernetes_dashboard {
+      disabled = false
+    }
+    network_policy_config {
       disabled = false
     }
   }
